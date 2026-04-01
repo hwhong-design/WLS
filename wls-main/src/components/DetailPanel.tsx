@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CaseCard, CaseType, DocAttachment } from "@/lib/types";
+import { CaseCard, CaseType, DocAttachment, Debtor } from "@/lib/types";
 import { fmt, daysUntil, getTodayISO } from "@/lib/utils";
 
 interface DetailPanelProps {
@@ -12,22 +12,25 @@ interface DetailPanelProps {
   onClose: () => void;
   onStatusChange: (newCol: string) => void;
   onAddTimeline: (dt: string, ti: string, dc: string) => void;
-  onEditTimeline: (index: number, dt: string, ti: string, dc: string) => void;
-  onDeleteTimeline: (index: number) => void;
   onAddFollowUp: (dt: string, ti: string) => void;
-  onEditFollowUp: (index: number, dt: string, ti: string) => void;
-  onDeleteFollowUp: (index: number) => void;
   onToggleFollowUp: (index: number) => void;
   onSaveAmount: (orig: number, paid: number, extra: number) => void;
   onRename: (name: string, sub: string) => void;
   onDelete: () => void;
   onSaveSolDt: (dt: string) => void;
   onSaveProjUrl: (url: string) => void;
-  onSaveDriveUrl: (url: string) => void;
   onAddDoc: (doc: DocAttachment) => void;
   onDeleteDoc: (index: number) => void;
-  onEditDoc: (index: number, doc: DocAttachment) => void;
   showToast: (msg: string) => void;
+  onEditTimeline: (index: number, dt: string, ti: string, dc: string) => void;
+  onDeleteTimeline: (index: number) => void;
+  onEditFollowUp: (index: number, dt: string, ti: string) => void;
+  onDeleteFollowUp: (index: number) => void;
+  onSaveDriveUrl: (url: string) => void;
+  onEditDoc: (index: number, doc: DocAttachment) => void;
+  onSaveDebtorInfo: (info: CaseCard["debtorInfo"], debtorId?: string) => void;
+  debtors?: Debtor[];
+  onNavigateToDebtors?: () => void;
 }
 
 export default function DetailPanel({
@@ -38,22 +41,25 @@ export default function DetailPanel({
   onClose,
   onStatusChange,
   onAddTimeline,
-  onEditTimeline,
-  onDeleteTimeline,
   onAddFollowUp,
-  onEditFollowUp,
-  onDeleteFollowUp,
   onToggleFollowUp,
   onSaveAmount,
   onRename,
   onDelete,
   onSaveSolDt,
   onSaveProjUrl,
-  onSaveDriveUrl,
   onAddDoc,
   onDeleteDoc,
-  onEditDoc,
   showToast,
+  onEditTimeline,
+  onDeleteTimeline,
+  onEditFollowUp,
+  onDeleteFollowUp,
+  onSaveDriveUrl,
+  onEditDoc,
+  onSaveDebtorInfo,
+  debtors = [],
+  onNavigateToDebtors,
 }: DetailPanelProps) {
   const [selectedCol, setSelectedCol] = useState("");
   const [tlDate, setTlDate] = useState(getTodayISO());
@@ -71,26 +77,38 @@ export default function DetailPanel({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [projUrl, setProjUrl] = useState("");
   const [editingProjUrl, setEditingProjUrl] = useState(false);
-  const [driveUrl, setDriveUrl] = useState("");
-  const [editingDriveUrl, setEditingDriveUrl] = useState(false);
   const [docTitle, setDocTitle] = useState("");
   const [docUrl, setDocUrl] = useState("");
 
-  // 타임라인 수정 상태
+  // Drive URL editing
+  const [editingDriveUrl, setEditingDriveUrl] = useState(false);
+  const [driveUrl, setDriveUrl] = useState("");
+
+  // Timeline editing
   const [editingTlIndex, setEditingTlIndex] = useState<number | null>(null);
   const [editTlDate, setEditTlDate] = useState("");
   const [editTlTitle, setEditTlTitle] = useState("");
   const [editTlContent, setEditTlContent] = useState("");
 
-  // 팔로업 수정 상태
+  // FollowUp editing
   const [editingFuIndex, setEditingFuIndex] = useState<number | null>(null);
   const [editFuDate, setEditFuDate] = useState("");
   const [editFuTitle, setEditFuTitle] = useState("");
 
-  // 첨부문서 수정 상태
+  // Doc editing
   const [editingDocIndex, setEditingDocIndex] = useState<number | null>(null);
   const [editDocTitle, setEditDocTitle] = useState("");
   const [editDocUrl, setEditDocUrl] = useState("");
+
+  // Debtor info
+  const [debtorSearch, setDebtorSearch] = useState("");
+  const [showDebtorSuggest, setShowDebtorSuggest] = useState(false);
+  const [editingDebtorInfo, setEditingDebtorInfo] = useState(false);
+  const [debtorFormType, setDebtorFormType] = useState("");
+  const [debtorFormPhone, setDebtorFormPhone] = useState("");
+  const [debtorFormAddress, setDebtorFormAddress] = useState("");
+  const [debtorFormBizNo, setDebtorFormBizNo] = useState("");
+  const [debtorFormCaseNo, setDebtorFormCaseNo] = useState("");
 
   useEffect(() => {
     if (card) {
@@ -109,6 +127,18 @@ export default function DetailPanel({
       setEditingTlIndex(null);
       setEditingFuIndex(null);
       setEditingDocIndex(null);
+      setDebtorSearch(card.name || "");
+      setShowDebtorSuggest(false);
+      setEditingDebtorInfo(false);
+      if (card.debtorInfo) {
+        setDebtorFormType(card.debtorInfo.type || "");
+        setDebtorFormPhone(card.debtorInfo.phone || "");
+        setDebtorFormAddress(card.debtorInfo.address || "");
+        setDebtorFormBizNo(card.debtorInfo.bizNo || "");
+        setDebtorFormCaseNo(card.debtorInfo.caseNo || "");
+      } else {
+        setDebtorFormType(""); setDebtorFormPhone(""); setDebtorFormAddress(""); setDebtorFormBizNo(""); setDebtorFormCaseNo("");
+      }
       if (card.amt) {
         setAmtOrig(card.amt.orig || 0);
         setAmtPaid(card.amt.paid || 0);
@@ -173,50 +203,16 @@ export default function DetailPanel({
     setDocUrl("");
   }
 
-  // 인라인 수정 버튼 스타일
-  const editBtnStyle: React.CSSProperties = {
-    background: "var(--sf2)",
-    border: "1px solid var(--bd)",
-    borderRadius: 4,
-    padding: "2px 7px",
-    fontSize: 10,
-    color: "var(--tx3)",
-    cursor: "pointer",
-  };
-  const delBtnStyle: React.CSSProperties = {
-    background: "var(--rl)",
-    border: "1px solid var(--rd)",
-    borderRadius: 4,
-    padding: "2px 7px",
-    fontSize: 10,
-    color: "var(--rd)",
-    cursor: "pointer",
-  };
-  const saveBtnStyle: React.CSSProperties = {
-    background: "var(--gn)",
-    border: "none",
-    borderRadius: 4,
-    padding: "4px 10px",
-    fontSize: 11,
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 600,
-  };
-  const cancelBtnStyle: React.CSSProperties = {
-    background: "var(--sf2)",
-    border: "1px solid var(--bd)",
-    borderRadius: 4,
-    padding: "4px 10px",
-    fontSize: 11,
-    color: "var(--tx2)",
-    cursor: "pointer",
-  };
-
   return (
     <div
       className="fixed inset-0 z-[400] flex items-stretch"
-      style={{ background: "rgba(0,0,0,.45)", backdropFilter: "blur(2px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        background: "rgba(0,0,0,.45)",
+        backdropFilter: "blur(2px)",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="ml-auto flex flex-col overflow-y-auto animate-slide-in"
@@ -239,16 +235,20 @@ export default function DetailPanel({
           <button
             className="absolute flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bd)]"
             style={{
-              right: 24, top: 24,
+              right: 24,
+              top: 24,
               background: "var(--bg)",
               border: "1px solid var(--bd)",
               borderRadius: "50%",
-              width: 30, height: 30,
+              width: 30,
+              height: 30,
               fontSize: 14,
               color: "var(--tx3)",
             }}
             onClick={onClose}
-          >✕</button>
+          >
+            ✕
+          </button>
 
           <div
             className="inline-block font-bold mb-2.5"
@@ -270,11 +270,13 @@ export default function DetailPanel({
                 type="text"
                 className="w-full font-bold outline-none mb-1.5"
                 style={{
-                  fontSize: 18, letterSpacing: -0.3,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
                   padding: "4px 8px",
                   border: "1px solid var(--gn)",
                   borderRadius: "var(--r3)",
-                  background: "var(--sf)", color: "var(--tx)",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
                 }}
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
@@ -285,10 +287,12 @@ export default function DetailPanel({
                   type="text"
                   className="w-full outline-none"
                   style={{
-                    fontSize: 11, padding: "4px 8px",
+                    fontSize: 11,
+                    padding: "4px 8px",
                     border: "1px solid var(--bd)",
                     borderRadius: "var(--r3)",
-                    background: "var(--sf)", color: "var(--tx2)",
+                    background: "var(--sf)",
+                    color: "var(--tx2)",
                   }}
                   value={editSub}
                   onChange={(e) => setEditSub(e.target.value)}
@@ -299,47 +303,81 @@ export default function DetailPanel({
                 <button
                   className="font-semibold cursor-pointer transition-opacity hover:opacity-85"
                   style={{
-                    background: "var(--gn)", color: "#fff",
-                    border: "none", borderRadius: "var(--r3)",
-                    padding: "5px 12px", fontSize: 11,
+                    background: "var(--gn)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "var(--r3)",
+                    padding: "5px 12px",
+                    fontSize: 11,
                   }}
                   onClick={() => {
-                    if (!editName.trim()) { showToast("이름을 입력해주세요."); return; }
+                    if (!editName.trim()) {
+                      showToast("이름을 입력해주세요.");
+                      return;
+                    }
                     onRename(editName.trim(), editSub.trim());
                     setEditingName(false);
                   }}
-                >저장</button>
+                >
+                  저장
+                </button>
                 <button
                   className="cursor-pointer transition-opacity hover:opacity-85"
                   style={{
-                    background: "var(--sf2)", color: "var(--tx2)",
-                    border: "1px solid var(--bd)", borderRadius: "var(--r3)",
-                    padding: "5px 12px", fontSize: 11,
+                    background: "var(--sf2)",
+                    color: "var(--tx2)",
+                    border: "1px solid var(--bd)",
+                    borderRadius: "var(--r3)",
+                    padding: "5px 12px",
+                    fontSize: 11,
                   }}
-                  onClick={() => { setEditName(card.name); setEditSub(card.sub); setEditingName(false); }}
-                >취소</button>
+                  onClick={() => {
+                    setEditName(card.name);
+                    setEditSub(card.sub);
+                    setEditingName(false);
+                  }}
+                >
+                  취소
+                </button>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3" style={{ paddingRight: 40, marginBottom: 6 }}>
-                <div className="font-bold" style={{ fontSize: 18, letterSpacing: -0.3 }}>
+              <div
+                className="flex items-center gap-3"
+                style={{ paddingRight: 40, marginBottom: 6 }}
+              >
+                <div
+                  className="font-bold"
+                  style={{ fontSize: 18, letterSpacing: -0.3 }}
+                >
                   {card.name}
                 </div>
                 <button
                   className="shrink-0 flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bd)]"
                   style={{
-                    width: 24, height: 24,
+                    width: 24,
+                    height: 24,
                     background: "var(--sf2)",
                     border: "1px solid var(--bd)",
-                    borderRadius: 4, fontSize: 12, color: "var(--tx3)",
+                    borderRadius: 4,
+                    fontSize: 12,
+                    color: "var(--tx3)",
                   }}
                   onClick={() => setEditingName(true)}
                   title="이름 수정"
-                >✏️</button>
+                >
+                  ✏️
+                </button>
               </div>
               {type === "disp" && card.sub && (
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 18 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--tx3)",
+                    marginBottom: 18,
+                  }}
+                >
                   {card.sub}
                 </div>
               )}
@@ -356,109 +394,124 @@ export default function DetailPanel({
                 borderRadius: "var(--r3)",
                 fontSize: 12,
                 fontFamily: "'Noto Sans KR', sans-serif",
-                background: "var(--sf)", color: "var(--tx)",
+                background: "var(--sf)",
+                color: "var(--tx)",
               }}
               value={selectedCol}
               onChange={(e) => setSelectedCol(e.target.value)}
             >
-              {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+              {columns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
             <button
               className="shrink-0 font-semibold cursor-pointer transition-opacity hover:opacity-85"
               style={{
-                background: "var(--gn)", color: "#fff",
-                border: "none", borderRadius: "var(--r3)",
-                padding: "8px 16px", fontSize: 12,
+                background: "var(--gn)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--r3)",
+                padding: "8px 16px",
+                fontSize: 12,
                 fontFamily: "'Noto Sans KR', sans-serif",
               }}
               onClick={handleStatusChange}
-            >단계 변경</button>
+            >
+              단계 변경
+            </button>
           </div>
 
-          {/* Links */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Drive URL */}
             {editingDriveUrl ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="url"
-                  className="outline-none"
-                  style={{
-                    width: 220, padding: "5px 10px",
-                    border: "1px solid var(--gn)",
-                    borderRadius: "var(--r3)", fontSize: 11,
-                    fontFamily: "'Noto Sans KR', sans-serif",
-                    background: "var(--sf)", color: "var(--tx)",
-                  }}
-                  placeholder="https://drive.google.com/..."
-                  value={driveUrl}
-                  onChange={(e) => setDriveUrl(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      onSaveDriveUrl(driveUrl.trim());
-                      setEditingDriveUrl(false);
-                    } else if (e.key === "Escape") {
-                      setDriveUrl(card.drv || "");
-                      setEditingDriveUrl(false);
-                    }
-                  }}
-                />
-                <button style={saveBtnStyle} onClick={() => { onSaveDriveUrl(driveUrl.trim()); setEditingDriveUrl(false); }}>저장</button>
-                <button style={cancelBtnStyle} onClick={() => { setDriveUrl(card.drv || ""); setEditingDriveUrl(false); }}>취소</button>
+              <div className="flex items-center gap-2 w-full mb-1">
+                <input type="url" className="flex-1 outline-none transition-all focus:border-[var(--gn)]"
+                  style={{ padding: "5px 10px", border: "1px solid var(--gn)", borderRadius: "var(--r3)", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                  placeholder="구글 드라이브 URL" value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") { onSaveDriveUrl(driveUrl.trim()); setEditingDriveUrl(false); } else if (e.key === "Escape") { setDriveUrl(card.drv || ""); setEditingDriveUrl(false); } }} />
+                <button className="shrink-0 font-semibold cursor-pointer hover:opacity-85" style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "5px 10px", fontSize: 10 }}
+                  onClick={() => { onSaveDriveUrl(driveUrl.trim()); setEditingDriveUrl(false); }}>저장</button>
+                <button className="shrink-0 cursor-pointer hover:opacity-85" style={{ background: "var(--sf2)", color: "var(--tx2)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "5px 10px", fontSize: 10 }}
+                  onClick={() => { setDriveUrl(card.drv || ""); setEditingDriveUrl(false); }}>취소</button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <a
-                  href={card.drv}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 transition-opacity hover:opacity-80"
-                  style={{
-                    fontSize: 11, color: "var(--bl)",
-                    background: "var(--bll)",
-                    padding: "5px 12px", borderRadius: "var(--r3)",
-                    textDecoration: "none",
-                  }}
-                >📁 드라이브 폴더 열기</a>
-                <button
-                  className="shrink-0 flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bd)]"
-                  style={{
-                    width: 22, height: 22,
-                    background: "var(--sf2)",
-                    border: "1px solid var(--bd)",
-                    borderRadius: 4, fontSize: 10, color: "var(--tx3)",
-                  }}
-                  onClick={() => setEditingDriveUrl(true)}
-                  title="드라이브 링크 수정"
-                >✏️</button>
+                <a href={card.drv} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 transition-opacity hover:opacity-80"
+                  style={{ fontSize: 11, color: "var(--bl)", background: "var(--bll)", padding: "5px 12px", borderRadius: "var(--r3)", textDecoration: "none" }}>
+                  📁 드라이브 폴더 열기
+                </a>
+                <button className="shrink-0 flex items-center justify-center cursor-pointer hover:bg-[var(--bd)]"
+                  style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11, color: "var(--tx3)" }}
+                  onClick={() => { setDriveUrl(card.drv || ""); setEditingDriveUrl(true); }} title="드라이브 링크 수정">✏️</button>
               </div>
             )}
 
-            {/* Project URL */}
             {editingProjUrl ? (
               <div className="flex items-center gap-2">
                 <input
                   type="url"
                   className="outline-none transition-all focus:border-[var(--gn)]"
                   style={{
-                    width: 220, padding: "5px 10px",
+                    width: 220,
+                    padding: "5px 10px",
                     border: "1px solid var(--gn)",
-                    borderRadius: "var(--r3)", fontSize: 11,
+                    borderRadius: "var(--r3)",
+                    fontSize: 11,
                     fontFamily: "'Noto Sans KR', sans-serif",
-                    background: "var(--sf)", color: "var(--tx)",
+                    background: "var(--sf)",
+                    color: "var(--tx)",
                   }}
                   placeholder="https://..."
                   value={projUrl}
                   onChange={(e) => setProjUrl(e.target.value)}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") { onSaveProjUrl(projUrl.trim()); setEditingProjUrl(false); showToast(projUrl.trim() ? "프로젝트 링크가 저장됐어요." : "프로젝트 링크가 삭제됐어요."); }
-                    else if (e.key === "Escape") { setProjUrl(card.projUrl || ""); setEditingProjUrl(false); }
+                    if (e.key === "Enter") {
+                      onSaveProjUrl(projUrl.trim());
+                      setEditingProjUrl(false);
+                      showToast(projUrl.trim() ? "프로젝트 링크가 저장됐어요." : "프로젝트 링크가 삭제됐어요.");
+                    } else if (e.key === "Escape") {
+                      setProjUrl(card.projUrl || "");
+                      setEditingProjUrl(false);
+                    }
                   }}
                 />
-                <button style={saveBtnStyle} onClick={() => { onSaveProjUrl(projUrl.trim()); setEditingProjUrl(false); showToast("프로젝트 링크가 저장됐어요."); }}>저장</button>
-                <button style={cancelBtnStyle} onClick={() => { setProjUrl(card.projUrl || ""); setEditingProjUrl(false); }}>취소</button>
+                <button
+                  className="shrink-0 font-semibold cursor-pointer transition-opacity hover:opacity-85"
+                  style={{
+                    background: "var(--gn)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "var(--r3)",
+                    padding: "5px 10px",
+                    fontSize: 10,
+                  }}
+                  onClick={() => {
+                    onSaveProjUrl(projUrl.trim());
+                    setEditingProjUrl(false);
+                    showToast(projUrl.trim() ? "프로젝트 링크가 저장됐어요." : "프로젝트 링크가 삭제됐어요.");
+                  }}
+                >
+                  저장
+                </button>
+                <button
+                  className="shrink-0 cursor-pointer transition-opacity hover:opacity-85"
+                  style={{
+                    background: "var(--sf2)",
+                    color: "var(--tx2)",
+                    border: "1px solid var(--bd)",
+                    borderRadius: "var(--r3)",
+                    padding: "5px 10px",
+                    fontSize: 10,
+                  }}
+                  onClick={() => {
+                    setProjUrl(card.projUrl || "");
+                    setEditingProjUrl(false);
+                  }}
+                >
+                  취소
+                </button>
               </div>
             ) : projUrl ? (
               <div className="flex items-center gap-1.5">
@@ -468,35 +521,48 @@ export default function DetailPanel({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 transition-opacity hover:opacity-80"
                   style={{
-                    fontSize: 11, color: "var(--gn)",
+                    fontSize: 11,
+                    color: "var(--gn)",
                     background: "var(--gl)",
-                    padding: "5px 12px", borderRadius: "var(--r3)",
+                    padding: "5px 12px",
+                    borderRadius: "var(--r3)",
                     textDecoration: "none",
                   }}
-                >🔗 프로젝트 링크 &gt;</a>
+                >
+                  🔗 프로젝트 링크 &gt;
+                </a>
                 <button
                   className="shrink-0 flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bd)]"
                   style={{
-                    width: 22, height: 22,
+                    width: 22,
+                    height: 22,
                     background: "var(--sf2)",
                     border: "1px solid var(--bd)",
-                    borderRadius: 4, fontSize: 10, color: "var(--tx3)",
+                    borderRadius: 4,
+                    fontSize: 10,
+                    color: "var(--tx3)",
                   }}
                   onClick={() => setEditingProjUrl(true)}
                   title="프로젝트 링크 수정"
-                >✏️</button>
+                >
+                  ✏️
+                </button>
               </div>
             ) : (
               <button
                 className="inline-flex items-center gap-1 cursor-pointer transition-opacity hover:opacity-80"
                 style={{
-                  fontSize: 11, color: "var(--tx3)",
+                  fontSize: 11,
+                  color: "var(--tx3)",
                   background: "var(--sf2)",
-                  padding: "5px 12px", borderRadius: "var(--r3)",
+                  padding: "5px 12px",
+                  borderRadius: "var(--r3)",
                   border: "1px solid var(--bd)",
                 }}
                 onClick={() => setEditingProjUrl(true)}
-              >🔗 프로젝트 링크 추가</button>
+              >
+                🔗 프로젝트 링크 추가
+              </button>
             )}
           </div>
         </div>
@@ -504,44 +570,217 @@ export default function DetailPanel({
         {/* Body */}
         <div className="flex-1" style={{ padding: "36px 40px" }}>
 
-          {/* Amount (recv only) */}
+          {/* Debtor info section */}
+          <SectionTitle>채무자 인적사항</SectionTitle>
+          <div className="mb-12" style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: 26 }}>
+            {/* Autocomplete search */}
+            <div className="relative mb-4">
+              <div className="font-bold" style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 8 }}>채무자 검색 (채무자 정보 탭과 연동)</div>
+              <div className="relative">
+                <input type="text" className="w-full outline-none transition-all focus:border-[var(--gn)]"
+                  style={{ padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                  placeholder="채무자명 또는 상호 입력..."
+                  value={debtorSearch}
+                  onChange={(e) => { setDebtorSearch(e.target.value); setShowDebtorSuggest(true); }}
+                  onFocus={() => setShowDebtorSuggest(true)}
+                />
+                {showDebtorSuggest && debtorSearch && (
+                  <div className="absolute z-50 w-full bg-[var(--sf)] border border-[var(--bd)] rounded-lg shadow-lg" style={{ top: "100%", marginTop: 2, maxHeight: 200, overflowY: "auto" }}>
+                    {debtors.filter((d) => d.name.includes(debtorSearch)).length === 0 ? (
+                      <div style={{ padding: "10px 14px", fontSize: 12, color: "var(--tx3)" }}>검색 결과 없음</div>
+                    ) : (
+                      debtors.filter((d) => d.name.includes(debtorSearch)).map((d) => (
+                        <div key={d.id} className="cursor-pointer hover:bg-[var(--bg)] transition-colors"
+                          style={{ padding: "10px 14px", borderBottom: "1px solid var(--bd)" }}
+                          onClick={() => {
+                            setDebtorSearch(d.name);
+                            setShowDebtorSuggest(false);
+                            setDebtorFormType(d.type === "corp" ? "법인" : "개인");
+                            setDebtorFormPhone(d.phone || "");
+                            setDebtorFormAddress(d.address || "");
+                            setDebtorFormBizNo(d.bizNo || d.rrn || "");
+                            setDebtorFormCaseNo(d.caseNo || "");
+                            onSaveDebtorInfo({
+                              type: d.type === "corp" ? "법인" : "개인",
+                              phone: d.phone, address: d.address,
+                              bizNo: d.bizNo || d.rrn, ceo: d.ceo, caseNo: d.caseNo,
+                            }, d.id);
+                          }}>
+                          <div className="font-semibold" style={{ fontSize: 12 }}>{d.name}</div>
+                          <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>
+                            {d.type === "corp" ? "법인" : "개인"}{d.caseNo ? ` · ${d.caseNo}` : ""}{d.phone ? ` · ${d.phone}` : ""}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Debtor info display */}
+            {card.debtorInfo ? (
+              <div>
+                <div className="grid grid-cols-2" style={{ gap: 8, marginBottom: 12 }}>
+                  {[
+                    { label: "유형", value: card.debtorInfo.type },
+                    { label: "연락처", value: card.debtorInfo.phone },
+                    { label: "사건번호", value: card.debtorInfo.caseNo },
+                    { label: "사업자/주민번호", value: card.debtorInfo.bizNo },
+                  ].map(({ label, value }) => value ? (
+                    <div key={label} style={{ background: "var(--sf)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "8px 12px" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "var(--tx3)", letterSpacing: 0.3, marginBottom: 3, textTransform: "uppercase" }}>{label}</div>
+                      <div style={{ fontSize: 12, color: "var(--tx)" }}>{value}</div>
+                    </div>
+                  ) : null)}
+                  {card.debtorInfo.address && (
+                    <div style={{ gridColumn: "1/-1", background: "var(--sf)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "8px 12px" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "var(--tx3)", letterSpacing: 0.3, marginBottom: 3, textTransform: "uppercase" }}>주소</div>
+                      <div style={{ fontSize: 12, color: "var(--tx)" }}>{card.debtorInfo.address}</div>
+                    </div>
+                  )}
+                </div>
+                <button className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80"
+                  style={{ fontSize: 11, color: "var(--bl)", background: "var(--bll)", padding: "5px 12px", borderRadius: "var(--r3)", border: "none" }}
+                  onClick={onNavigateToDebtors}>
+                  👥 채무자 정보 탭에서 자세히 보기 →
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--tx3)" }}>
+                위에서 채무자를 검색하거나{" "}
+                <button className="cursor-pointer hover:opacity-80" style={{ color: "var(--bl)", background: "none", border: "none", fontSize: 12, textDecoration: "underline" }} onClick={onNavigateToDebtors}>
+                  채무자 정보 탭
+                </button>
+                에서 먼저 등록하세요.
+              </div>
+            )}
+          </div>
+
+          {/* Amount section (recv only) */}
           {type === "recv" && (
             <>
               <SectionTitle>금액 정보</SectionTitle>
-              <div className="mb-12" style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: 26 }}>
-                <div className="font-bold" style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 20 }}>
+              <div
+                className="mb-12"
+                style={{
+                  background: "var(--bg)",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r2)",
+                  padding: 26,
+                }}
+              >
+                <div
+                  className="font-bold"
+                  style={{
+                    fontSize: 11,
+                    color: "var(--tx2)",
+                    marginBottom: 20,
+                  }}
+                >
                   금액 정보 입력 — 통계에 자동 반영됩니다
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <AmtInput label="최초발생금액" value={amtOrig} onChange={setAmtOrig} />
-                  <AmtInput label="원금변제금액" value={amtPaid} onChange={setAmtPaid} />
-                  <AmtInput label="지연손해금 등" value={amtExtra} onChange={setAmtExtra} />
+                  <AmtInput
+                    label="최초발생금액"
+                    value={amtOrig}
+                    onChange={setAmtOrig}
+                  />
+                  <AmtInput
+                    label="원금변제금액"
+                    value={amtPaid}
+                    onChange={setAmtPaid}
+                  />
+                  <AmtInput
+                    label="지연손해금 등"
+                    value={amtExtra}
+                    onChange={setAmtExtra}
+                  />
                   <div className="flex flex-col gap-1.5">
-                    <div className="font-bold uppercase" style={{ fontSize: 9, color: "var(--tx3)", letterSpacing: 0.5 }}>미수채권잔액</div>
+                    <div
+                      className="font-bold uppercase"
+                      style={{
+                        fontSize: 9,
+                        color: "var(--tx3)",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      미수채권잔액
+                    </div>
                     <input
                       className="w-full"
-                      style={{ padding: "7px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'DM Mono', monospace", background: "var(--sf2)", color: "var(--tx3)", outline: "none" }}
+                      style={{
+                        padding: "7px 10px",
+                        border: "1px solid var(--bd)",
+                        borderRadius: "var(--r3)",
+                        fontSize: 12,
+                        fontFamily: "'DM Mono', monospace",
+                        background: "var(--sf2)",
+                        color: "var(--tx3)",
+                        outline: "none",
+                      }}
                       value={remain > 0 ? remain : ""}
                       readOnly
                       placeholder="자동계산"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5 mt-4 pt-4" style={{ borderTop: "1px solid var(--bd)" }}>
+                <div
+                  className="grid grid-cols-2 gap-2.5 mt-4 pt-4"
+                  style={{ borderTop: "1px solid var(--bd)" }}
+                >
                   <div>
-                    <div className="font-semibold" style={{ fontSize: 9, color: "var(--tx3)" }}>변제총액</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, color: "var(--gn)" }}>{total ? `${fmt(total)}원` : "-"}</div>
+                    <div
+                      className="font-semibold"
+                      style={{ fontSize: 9, color: "var(--tx3)" }}
+                    >
+                      변제총액
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "var(--gn)",
+                      }}
+                    >
+                      {total ? `${fmt(total)}원` : "-"}
+                    </div>
                   </div>
                   <div>
-                    <div className="font-semibold" style={{ fontSize: 9, color: "var(--tx3)" }}>미수채권잔액</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500, color: "var(--rd)" }}>{remain > 0 ? `${fmt(remain)}원` : "-"}</div>
+                    <div
+                      className="font-semibold"
+                      style={{ fontSize: 9, color: "var(--tx3)" }}
+                    >
+                      미수채권잔액
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "var(--rd)",
+                      }}
+                    >
+                      {remain > 0 ? `${fmt(remain)}원` : "-"}
+                    </div>
                   </div>
                 </div>
                 <button
                   className="w-full mt-4 font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                  style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "7px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                  style={{
+                    background: "var(--gn)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "var(--r3)",
+                    padding: "7px 14px",
+                    fontSize: 12,
+                    fontFamily: "'Noto Sans KR', sans-serif",
+                  }}
                   onClick={handleSaveAmount}
-                >저장 — 통계에 반영</button>
+                >
+                  저장 — 통계에 반영
+                </button>
               </div>
             </>
           )}
@@ -550,27 +789,80 @@ export default function DetailPanel({
           {type === "recv" && (
             <>
               <SectionTitle>소멸시효</SectionTitle>
-              <div className="mb-12" style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: 26 }}>
-                <div className="font-bold" style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 12 }}>소멸시효 만료일</div>
+              <div
+                className="mb-12"
+                style={{
+                  background: "var(--bg)",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r2)",
+                  padding: 26,
+                }}
+              >
+                <div
+                  className="font-bold"
+                  style={{
+                    fontSize: 11,
+                    color: "var(--tx2)",
+                    marginBottom: 12,
+                  }}
+                >
+                  소멸시효 만료일
+                </div>
                 <div className="flex gap-3">
                   <input
                     type="date"
                     className="flex-1 outline-none transition-all focus:border-[var(--gn)]"
-                    style={{ padding: "7px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'DM Mono', monospace", background: "var(--sf)", color: "var(--tx)" }}
+                    style={{
+                      padding: "7px 10px",
+                      border: "1px solid var(--bd)",
+                      borderRadius: "var(--r3)",
+                      fontSize: 12,
+                      fontFamily: "'DM Mono', monospace",
+                      background: "var(--sf)",
+                      color: "var(--tx)",
+                    }}
                     value={solDt}
                     onChange={(e) => setSolDt(e.target.value)}
                   />
                   <button
                     className="shrink-0 font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                    style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "7px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
-                    onClick={() => { onSaveSolDt(solDt); showToast(solDt ? "소멸시효가 저장됐어요." : "소멸시효가 삭제됐어요."); }}
-                  >저장</button>
+                    style={{
+                      background: "var(--gn)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "var(--r3)",
+                      padding: "7px 14px",
+                      fontSize: 12,
+                      fontFamily: "'Noto Sans KR', sans-serif",
+                    }}
+                    onClick={() => {
+                      onSaveSolDt(solDt);
+                      showToast(solDt ? "소멸시효가 저장됐어요." : "소멸시효가 삭제됐어요.");
+                    }}
+                  >
+                    저장
+                  </button>
                 </div>
                 {solDt && (
-                  <div className="mt-3 flex items-center gap-2" style={{ fontSize: 11 }}>
+                  <div
+                    className="mt-3 flex items-center gap-2"
+                    style={{ fontSize: 11 }}
+                  >
                     <span style={{ color: "var(--tx3)" }}>⏳ 만료까지</span>
-                    <span className="font-bold" style={{ color: daysUntil(solDt) <= 30 ? "var(--rd)" : daysUntil(solDt) <= 90 ? "var(--og)" : "var(--gn)" }}>
-                      {daysUntil(solDt) <= 0 ? "만료됨" : `D-${daysUntil(solDt)}`}
+                    <span
+                      className="font-bold"
+                      style={{
+                        color:
+                          daysUntil(solDt) <= 30
+                            ? "var(--rd)"
+                            : daysUntil(solDt) <= 90
+                              ? "var(--og)"
+                              : "var(--gn)",
+                      }}
+                    >
+                      {daysUntil(solDt) <= 0
+                        ? "만료됨"
+                        : `D-${daysUntil(solDt)}`}
                     </span>
                   </div>
                 )}
@@ -578,77 +870,76 @@ export default function DetailPanel({
             </>
           )}
 
-          {/* ── 타임라인 ── */}
+          {/* Timeline */}
           <SectionTitle>타임라인</SectionTitle>
-          <div className="flex flex-col mb-6">
-            {card.tl.length === 0 && (
-              <div style={{ fontSize: 12, color: "var(--tx3)", padding: "4px 0 16px" }}>등록된 기록이 없습니다.</div>
-            )}
+          <div className="flex flex-col mb-12">
             {card.tl.map((t, i) => (
-              <div key={i} className="flex gap-4 relative" style={{ paddingBottom: 24 }}>
+              <div
+                key={i}
+                className="flex gap-4 relative"
+                style={{
+                  paddingBottom: 24,
+                }}
+              >
+                {/* Vertical line */}
                 {i < card.tl.length - 1 && (
-                  <div className="absolute" style={{ left: 6, top: 18, bottom: -4, width: 1, background: "var(--bd)" }} />
+                  <div
+                    className="absolute"
+                    style={{
+                      left: 6,
+                      top: 18,
+                      bottom: -4,
+                      width: 1,
+                      background: "var(--bd)",
+                    }}
+                  />
                 )}
                 <div
                   className="shrink-0 rounded-full z-[1]"
                   style={{
-                    width: 13, height: 13,
+                    width: 13,
+                    height: 13,
                     background: t.dn ? "var(--tx3)" : "var(--gn)",
-                    border: "2px solid var(--sf)", marginTop: 3,
-                    boxShadow: t.dn ? "0 0 0 3px var(--sf2)" : "0 0 0 3px var(--gl)",
+                    border: "2px solid var(--sf)",
+                    marginTop: 3,
+                    boxShadow: t.dn
+                      ? "0 0 0 3px var(--sf2)"
+                      : "0 0 0 3px var(--gl)",
                   }}
                 />
                 <div className="flex-1">
                   {editingTlIndex === i ? (
-                    // 수정 폼
-                    <div style={{ background: "var(--bg)", border: "1px solid var(--gn)", borderRadius: "var(--r2)", padding: 14 }}>
+                    <div style={{ background: "var(--bg)", border: "1px solid var(--gn)", borderRadius: "var(--r2)", padding: 12 }}>
                       <div className="flex gap-2 mb-2">
-                        <input
-                          type="date"
-                          style={{ width: 130, padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                          value={editTlDate}
-                          onChange={(e) => setEditTlDate(e.target.value)}
-                        />
-                        <input
-                          type="text"
-                          className="flex-1"
-                          style={{ padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                          placeholder="제목"
-                          value={editTlTitle}
-                          onChange={(e) => setEditTlTitle(e.target.value)}
-                        />
+                        <input type="text" className="outline-none flex-1" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                          value={editTlDate} onChange={(e) => setEditTlDate(e.target.value)} placeholder="날짜" />
+                        <input type="text" className="outline-none flex-[2]" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                          value={editTlTitle} onChange={(e) => setEditTlTitle(e.target.value)} placeholder="제목" />
                       </div>
-                      <textarea
-                        className="w-full"
-                        style={{ padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", resize: "none", height: 50, outline: "none", fontFamily: "'Noto Sans KR', sans-serif" }}
-                        placeholder="내용 메모 (선택)"
-                        value={editTlContent}
-                        onChange={(e) => setEditTlContent(e.target.value)}
-                      />
-                      <div className="flex gap-2 mt-2">
-                        <button style={saveBtnStyle} onClick={() => {
-                          if (!editTlTitle.trim()) { showToast("제목을 입력해주세요."); return; }
-                          onEditTimeline(i, editTlDate, editTlTitle.trim(), editTlContent.trim());
-                          setEditingTlIndex(null);
-                        }}>저장</button>
-                        <button style={cancelBtnStyle} onClick={() => setEditingTlIndex(null)}>취소</button>
+                      <textarea className="w-full outline-none mb-2" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif", resize: "none", height: 46 }}
+                        value={editTlContent} onChange={(e) => setEditTlContent(e.target.value)} placeholder="내용 (선택)" />
+                      <div className="flex gap-2">
+                        <button className="font-semibold cursor-pointer" style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                          onClick={() => { if (editTlTitle.trim()) { onEditTimeline(i, editTlDate, editTlTitle.trim(), editTlContent.trim()); setEditingTlIndex(null); } }}>저장</button>
+                        <button className="cursor-pointer" style={{ background: "var(--sf2)", color: "var(--tx2)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                          onClick={() => setEditingTlIndex(null)}>취소</button>
+                        <button className="cursor-pointer ml-auto" style={{ background: "var(--rl)", color: "var(--rd)", border: "1px solid var(--rd)", borderRadius: "var(--r3)", padding: "5px 10px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                          onClick={() => { onDeleteTimeline(i); setEditingTlIndex(null); }}>🗑️</button>
                       </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="group/tl">
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>{t.dt}</div>
-                      <div className="font-semibold" style={{ fontSize: 13, marginBottom: 4, letterSpacing: -0.1 }}>{t.ti}</div>
-                      {t.dc && <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.6 }}>{t.dc}</div>}
-                      <div className="flex gap-1.5 mt-2">
-                        <button style={editBtnStyle} onClick={() => {
-                          setEditingTlIndex(i);
-                          setEditTlDate(t.dt.replace(/\./g, "-").replace(/\s/g, "").replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_, y, m, d) => `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`));
-                          setEditTlTitle(t.ti);
-                          setEditTlContent(t.dc || "");
-                        }}>✏️ 수정</button>
-                        <button style={delBtnStyle} onClick={() => { if (confirm("이 타임라인을 삭제할까요?")) onDeleteTimeline(i); }}>✕ 삭제</button>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <div className="font-semibold" style={{ fontSize: 13, marginBottom: 4, letterSpacing: -0.1 }}>{t.ti}</div>
+                          {t.dc && <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.6 }}>{t.dc}</div>}
+                        </div>
+                        <button className="shrink-0 opacity-0 group-hover/tl:opacity-100 transition-opacity cursor-pointer hover:bg-[var(--bd)]"
+                          style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11 }}
+                          onClick={() => { setEditTlDate(t.dt); setEditTlTitle(t.ti); setEditTlContent(t.dc || ""); setEditingTlIndex(i); }} title="수정">✏️</button>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -661,14 +952,31 @@ export default function DetailPanel({
               <input
                 type="date"
                 className="outline-none transition-all focus:border-[var(--gn)]"
-                style={{ width: 130, padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                style={{
+                  width: 130,
+                  padding: "8px 10px",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r3)",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
+                }}
                 value={tlDate}
                 onChange={(e) => setTlDate(e.target.value)}
               />
               <input
                 type="text"
                 className="flex-1 outline-none transition-all focus:border-[var(--gn)]"
-                style={{ padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r3)",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
+                }}
                 placeholder="제목 (예: 지급명령신청)"
                 value={tlTitle}
                 onChange={(e) => setTlTitle(e.target.value)}
@@ -677,7 +985,17 @@ export default function DetailPanel({
             <div className="mb-3">
               <textarea
                 className="w-full outline-none transition-all focus:border-[var(--gn)]"
-                style={{ padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)", resize: "none", height: 58 }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r3)",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
+                  resize: "none",
+                  height: 58,
+                }}
                 placeholder="내용 메모 (선택)"
                 value={tlContent}
                 onChange={(e) => setTlContent(e.target.value)}
@@ -686,79 +1004,102 @@ export default function DetailPanel({
             <div className="flex justify-end">
               <button
                 className="font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "8px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                style={{
+                  background: "var(--gn)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "var(--r3)",
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                }}
                 onClick={handleAddTimeline}
-              >추가</button>
+              >
+                추가
+              </button>
             </div>
           </FormBox>
 
-          {/* ── 첨부 문서 ── */}
+          {/* Documents */}
           <SectionTitle>첨부 문서</SectionTitle>
-          <div className="mb-12" style={{ background: "var(--gl)", border: "1px solid var(--gl2)", borderRadius: "var(--r2)", padding: 26 }}>
+          <div
+            className="mb-12"
+            style={{
+              background: "var(--gl)",
+              border: "1px solid var(--gl2)",
+              borderRadius: "var(--r2)",
+              padding: 26,
+            }}
+          >
             <div className="flex flex-col gap-3">
               {docs.length === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--tx3)", padding: "4px 0" }}>등록된 문서가 없습니다.</div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", padding: "4px 0" }}>
+                  등록된 문서가 없습니다.
+                </div>
               ) : (
                 docs.map((doc, i) => (
                   <div key={i}>
                     {editingDocIndex === i ? (
-                      <div style={{ background: "var(--sf)", border: "1px solid var(--gn)", borderRadius: "var(--r3)", padding: 12 }}>
+                      <div style={{ background: "var(--sf)", border: "1px solid var(--gn)", borderRadius: "var(--r3)", padding: "10px 12px" }}>
                         <div className="flex gap-2 mb-2">
-                          <input
-                            type="text"
-                            style={{ width: 130, padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                            placeholder="문서 제목"
-                            value={editDocTitle}
-                            onChange={(e) => setEditDocTitle(e.target.value)}
-                          />
-                          <input
-                            type="url"
-                            className="flex-1"
-                            style={{ padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                            placeholder="URL"
-                            value={editDocUrl}
-                            onChange={(e) => setEditDocUrl(e.target.value)}
-                          />
+                          <input type="text" className="outline-none flex-1" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                            value={editDocTitle} onChange={(e) => setEditDocTitle(e.target.value)} placeholder="문서 제목" />
+                          <input type="url" className="outline-none flex-[2]" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                            value={editDocUrl} onChange={(e) => setEditDocUrl(e.target.value)} placeholder="URL" />
                         </div>
                         <div className="flex gap-2">
-                          <button style={saveBtnStyle} onClick={() => {
-                            if (!editDocTitle.trim() || !editDocUrl.trim()) { showToast("제목과 URL을 입력해주세요."); return; }
-                            onEditDoc(i, { title: editDocTitle.trim(), url: editDocUrl.trim() });
-                            setEditingDocIndex(null);
-                          }}>저장</button>
-                          <button style={cancelBtnStyle} onClick={() => setEditingDocIndex(null)}>취소</button>
+                          <button className="font-semibold cursor-pointer" style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                            onClick={() => { if (editDocTitle.trim() && editDocUrl.trim()) { onEditDoc(i, { title: editDocTitle.trim(), url: editDocUrl.trim() }); setEditingDocIndex(null); } }}>저장</button>
+                          <button className="cursor-pointer" style={{ background: "var(--sf2)", color: "var(--tx2)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                            onClick={() => setEditingDocIndex(null)}>취소</button>
+                          <button className="cursor-pointer ml-auto" style={{ background: "var(--rl)", color: "var(--rd)", border: "1px solid var(--rd)", borderRadius: "var(--r3)", padding: "5px 10px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                            onClick={() => { onDeleteDoc(i); setEditingDocIndex(null); }}>🗑️</button>
                         </div>
                       </div>
                     ) : (
-                      <div
-                        className="flex items-center gap-3"
-                        style={{ background: "var(--sf)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "12px 18px" }}
-                      >
+                      <div className="flex items-center gap-3 group/doc" style={{ background: "var(--sf)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "12px 18px" }}>
                         <span style={{ fontSize: 14 }}>📄</span>
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 font-medium transition-opacity hover:opacity-70"
-                          style={{ fontSize: 12, color: "var(--bl)", textDecoration: "none" }}
-                        >{doc.title} &gt;</a>
-                        <div className="flex gap-1">
-                          <button style={editBtnStyle} onClick={() => { setEditingDocIndex(i); setEditDocTitle(doc.title); setEditDocUrl(doc.url); }} title="문서 수정">✏️</button>
-                          <button style={delBtnStyle} onClick={() => onDeleteDoc(i)} title="문서 삭제">✕</button>
-                        </div>
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex-1 font-medium transition-opacity hover:opacity-70" style={{ fontSize: 12, color: "var(--bl)", textDecoration: "none" }}>{doc.title} &gt;</a>
+                        <button className="shrink-0 opacity-0 group-hover/doc:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-[var(--bd)]"
+                          style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11 }}
+                          onClick={() => { setEditDocTitle(doc.title); setEditDocUrl(doc.url); setEditingDocIndex(i); }} title="수정">✏️</button>
+                        <button className="shrink-0 flex items-center justify-center cursor-pointer hover:bg-[var(--rl)]"
+                          style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11 }}
+                          onClick={() => onDeleteDoc(i)} title="삭제">🗑️</button>
                       </div>
                     )}
                   </div>
                 ))
               )}
             </div>
-            <div style={{ borderTop: "1px solid var(--gl2)", marginTop: 18, paddingTop: 18 }}>
-              <div className="font-bold" style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 12 }}>+ 문서 추가</div>
+
+            <div
+              style={{
+                borderTop: "1px solid var(--gl2)",
+                marginTop: 18,
+                paddingTop: 18,
+              }}
+            >
+              <div
+                className="font-bold"
+                style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 12 }}
+              >
+                + 문서 추가
+              </div>
               <div className="flex gap-3">
                 <input
                   type="text"
                   className="outline-none transition-all focus:border-[var(--gn)]"
-                  style={{ width: 130, padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                  style={{
+                    width: 130,
+                    padding: "8px 10px",
+                    border: "1px solid var(--bd)",
+                    borderRadius: "var(--r3)",
+                    fontSize: 12,
+                    fontFamily: "'Noto Sans KR', sans-serif",
+                    background: "var(--sf)",
+                    color: "var(--tx)",
+                  }}
                   placeholder="문서 제목"
                   value={docTitle}
                   onChange={(e) => setDocTitle(e.target.value)}
@@ -766,37 +1107,71 @@ export default function DetailPanel({
                 <input
                   type="url"
                   className="flex-1 outline-none transition-all focus:border-[var(--gn)]"
-                  style={{ padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                  style={{
+                    padding: "8px 10px",
+                    border: "1px solid var(--bd)",
+                    borderRadius: "var(--r3)",
+                    fontSize: 12,
+                    fontFamily: "'Noto Sans KR', sans-serif",
+                    background: "var(--sf)",
+                    color: "var(--tx)",
+                  }}
                   placeholder="구글 드라이브 URL"
                   value={docUrl}
                   onChange={(e) => setDocUrl(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAddDoc(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddDoc();
+                  }}
                 />
                 <button
                   className="shrink-0 font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                  style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "8px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                  style={{
+                    background: "var(--gn)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "var(--r3)",
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontFamily: "'Noto Sans KR', sans-serif",
+                  }}
                   onClick={handleAddDoc}
-                >추가</button>
+                >
+                  추가
+                </button>
               </div>
             </div>
           </div>
 
-          {/* ── 팔로업 ── */}
+          {/* Follow-ups */}
           <SectionTitle>팔로업</SectionTitle>
           <div className="flex flex-col gap-4 mb-12">
             {card.fu.length === 0 ? (
-              <div style={{ fontSize: 12, color: "var(--tx3)", padding: "4px 0" }}>등록된 팔로업이 없습니다.</div>
+              <div style={{ fontSize: 12, color: "var(--tx3)", padding: "4px 0" }}>
+                등록된 팔로업이 없습니다.
+              </div>
             ) : (
               card.fu.map((f, i) => {
                 const d = daysUntil(f.dt);
                 let cl = "ok";
                 let lb = `D-${d}`;
-                if (f.dn) { cl = "dn"; lb = "완료"; }
-                else if (d < 0) { cl = "ug"; lb = "지남"; }
-                else if (d <= 3) { cl = "ug"; lb = `D-${d}`; }
-                else if (d <= 7) { cl = "wn"; lb = `D-${d}`; }
+                if (f.dn) {
+                  cl = "dn";
+                  lb = "완료";
+                } else if (d < 0) {
+                  cl = "ug";
+                  lb = "지남";
+                } else if (d <= 3) {
+                  cl = "ug";
+                  lb = `D-${d}`;
+                } else if (d <= 7) {
+                  cl = "wn";
+                  lb = `D-${d}`;
+                }
 
-                const badgeStyles: Record<string, { bg: string; color: string }> = {
+                const badgeStyles: Record<
+                  string,
+                  { bg: string; color: string }
+                > = {
                   ug: { bg: "var(--rl)", color: "var(--rd)" },
                   wn: { bg: "var(--ol)", color: "var(--og)" },
                   ok: { bg: "var(--gl)", color: "var(--gn)" },
@@ -806,59 +1181,90 @@ export default function DetailPanel({
 
                 return (
                   <div key={i}>
-                    {editingFuIndex === i ? (
-                      <div style={{ background: "var(--bg)", border: "1px solid var(--gn)", borderRadius: "var(--r2)", padding: 14 }}>
-                        <div className="flex gap-2 mb-2">
-                          <input
-                            type="date"
-                            style={{ width: 130, padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                            value={editFuDate}
-                            onChange={(e) => setEditFuDate(e.target.value)}
-                          />
-                          <input
-                            type="text"
-                            className="flex-1"
-                            style={{ padding: "5px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", outline: "none" }}
-                            placeholder="팔로업 내용"
-                            value={editFuTitle}
-                            onChange={(e) => setEditFuTitle(e.target.value)}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button style={saveBtnStyle} onClick={() => {
-                            if (!editFuTitle.trim()) { showToast("내용을 입력해주세요."); return; }
-                            onEditFollowUp(i, editFuDate, editFuTitle.trim());
-                            setEditingFuIndex(null);
-                          }}>저장</button>
-                          <button style={cancelBtnStyle} onClick={() => setEditingFuIndex(null)}>취소</button>
-                        </div>
+                  {editingFuIndex === i ? (
+                    <div style={{ background: "var(--bg)", border: "1px solid var(--gn)", borderRadius: "var(--r2)", padding: "12px 16px" }}>
+                      <div className="flex gap-2 mb-2">
+                        <input type="date" className="outline-none" style={{ width: 130, padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                          value={editFuDate} onChange={(e) => setEditFuDate(e.target.value)} />
+                        <input type="text" className="flex-1 outline-none" style={{ padding: "6px 8px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 11, background: "var(--sf)", color: "var(--tx)", fontFamily: "'Noto Sans KR', sans-serif" }}
+                          value={editFuTitle} onChange={(e) => setEditFuTitle(e.target.value)} placeholder="팔로업 내용" />
                       </div>
-                    ) : (
+                      <div className="flex gap-2">
+                        <button className="font-semibold cursor-pointer" style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                          onClick={() => { if (editFuTitle.trim()) { onEditFollowUp(i, editFuDate, editFuTitle.trim()); setEditingFuIndex(null); } }}>저장</button>
+                        <button className="cursor-pointer" style={{ background: "var(--sf2)", color: "var(--tx2)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "5px 12px", fontSize: 11, fontFamily: "'Noto Sans KR', sans-serif" }}
+                          onClick={() => setEditingFuIndex(null)}>취소</button>
+                      </div>
+                    </div>
+                  ) : (
+                  <div
+                    className="flex items-center gap-3.5 group/fu"
+                    style={{
+                      background: "var(--bg)",
+                      border: "1px solid var(--bd)",
+                      borderRadius: "var(--r2)",
+                      padding: "14px 18px",
+                    }}
+                  >
+                    <div
+                      className="shrink-0 flex items-center justify-center cursor-pointer transition-all rounded-full"
+                      style={{
+                        width: 17,
+                        height: 17,
+                        border: f.dn
+                          ? "2px solid var(--gn)"
+                          : "2px solid var(--bd2)",
+                        background: f.dn ? "var(--gn)" : "transparent",
+                        color: "#fff",
+                        fontSize: 9,
+                      }}
+                      onClick={() => onToggleFollowUp(i)}
+                    >
+                      {f.dn ? "✓" : ""}
+                    </div>
+                    <div className="flex-1">
                       <div
-                        className="flex items-center gap-3.5"
-                        style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: "14px 18px" }}
+                        className="font-medium"
+                        style={{
+                          fontSize: 12,
+                          textDecoration: f.dn ? "line-through" : undefined,
+                          color: f.dn ? "var(--tx3)" : undefined,
+                        }}
                       >
-                        <div
-                          className="shrink-0 flex items-center justify-center cursor-pointer transition-all rounded-full"
-                          style={{
-                            width: 17, height: 17,
-                            border: f.dn ? "2px solid var(--gn)" : "2px solid var(--bd2)",
-                            background: f.dn ? "var(--gn)" : "transparent",
-                            color: "#fff", fontSize: 9,
-                          }}
-                          onClick={() => onToggleFollowUp(i)}
-                        >{f.dn ? "✓" : ""}</div>
-                        <div className="flex-1">
-                          <div className="font-medium" style={{ fontSize: 12, textDecoration: f.dn ? "line-through" : undefined, color: f.dn ? "var(--tx3)" : undefined }}>{f.ti}</div>
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>{f.dt}</div>
-                        </div>
-                        <div className="shrink-0 font-bold rounded-md" style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "3px 8px", background: bs.bg, color: bs.color }}>{lb}</div>
-                        <div className="flex gap-1">
-                          <button style={editBtnStyle} onClick={() => { setEditingFuIndex(i); setEditFuDate(f.dt); setEditFuTitle(f.ti); }}>✏️</button>
-                          <button style={delBtnStyle} onClick={() => { if (confirm("이 팔로업을 삭제할까요?")) onDeleteFollowUp(i); }}>✕</button>
-                        </div>
+                        {f.ti}
                       </div>
-                    )}
+                      <div
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: 10,
+                          color: "var(--tx3)",
+                          marginTop: 3,
+                        }}
+                      >
+                        {f.dt}
+                      </div>
+                    </div>
+                    <button className="shrink-0 opacity-0 group-hover/fu:opacity-100 transition-opacity cursor-pointer hover:bg-[var(--bd)]"
+                      style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11, flexShrink: 0 }}
+                      onClick={() => { setEditFuDate(f.dt); setEditFuTitle(f.ti); setEditingFuIndex(i); }} title="수정">✏️</button>
+                    <button className="shrink-0 opacity-0 group-hover/fu:opacity-100 transition-opacity cursor-pointer hover:bg-[var(--rl)]"
+                      style={{ width: 22, height: 22, background: "var(--sf2)", border: "1px solid var(--bd)", borderRadius: 4, fontSize: 11, flexShrink: 0 }}
+                      onClick={() => onDeleteFollowUp(i)} title="삭제">🗑️</button>
+                    <div
+                      className="shrink-0 font-bold rounded-md"
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: 10,
+                        padding: "3px 8px",
+                        background: bs.bg,
+                        color: bs.color,
+                      }}
+                    >
+                      {lb}
+                    </div>
+                  </div>
+                  </div>
+                  )}
                   </div>
                 );
               })
@@ -871,52 +1277,128 @@ export default function DetailPanel({
               <input
                 type="date"
                 className="outline-none transition-all focus:border-[var(--gn)]"
-                style={{ width: 130, padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                style={{
+                  width: 130,
+                  padding: "8px 10px",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r3)",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
+                }}
                 value={fuDate}
                 onChange={(e) => setFuDate(e.target.value)}
               />
               <input
                 type="text"
                 className="flex-1 outline-none transition-all focus:border-[var(--gn)]"
-                style={{ padding: "8px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif", background: "var(--sf)", color: "var(--tx)" }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1px solid var(--bd)",
+                  borderRadius: "var(--r3)",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  background: "var(--sf)",
+                  color: "var(--tx)",
+                }}
                 placeholder="예: 잔금 30% 입금 확인"
                 value={fuTitle}
                 onChange={(e) => setFuTitle(e.target.value)}
               />
               <button
                 className="shrink-0 font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                style={{ background: "var(--gn)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "8px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                style={{
+                  background: "var(--gn)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "var(--r3)",
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                }}
                 onClick={handleAddFollowUp}
-              >추가</button>
+              >
+                추가
+              </button>
             </div>
           </FormBox>
 
           {/* Delete */}
           <SectionTitle>위험 영역</SectionTitle>
-          <div className="mb-12" style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: 26 }}>
+          <div
+            className="mb-12"
+            style={{
+              background: "var(--bg)",
+              border: "1px solid var(--bd)",
+              borderRadius: "var(--r2)",
+              padding: 26,
+            }}
+          >
             {!showDeleteConfirm ? (
               <button
                 className="w-full font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                style={{ background: "var(--rl)", color: "var(--rd)", border: "1px solid var(--rd)", borderRadius: "var(--r3)", padding: "9px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                style={{
+                  background: "var(--rl)",
+                  color: "var(--rd)",
+                  border: "1px solid var(--rd)",
+                  borderRadius: "var(--r3)",
+                  padding: "9px 14px",
+                  fontSize: 12,
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                }}
                 onClick={() => setShowDeleteConfirm(true)}
-              >🗑️ 이 케이스 삭제</button>
+              >
+                🗑️ 이 케이스 삭제
+              </button>
             ) : (
               <div>
-                <div className="font-semibold mb-3" style={{ fontSize: 12, color: "var(--rd)" }}>
+                <div
+                  className="font-semibold mb-3"
+                  style={{ fontSize: 12, color: "var(--rd)" }}
+                >
                   정말 &ldquo;{card.name}&rdquo; 케이스를 삭제하시겠습니까?
                 </div>
-                <div className="mb-4" style={{ fontSize: 11, color: "var(--tx3)" }}>삭제된 케이스는 복구할 수 없습니다.</div>
+                <div
+                  className="mb-4"
+                  style={{ fontSize: 11, color: "var(--tx3)" }}
+                >
+                  삭제된 케이스는 복구할 수 없습니다.
+                </div>
                 <div className="flex gap-3">
                   <button
                     className="flex-1 font-semibold cursor-pointer transition-opacity hover:opacity-85"
-                    style={{ background: "var(--rd)", color: "#fff", border: "none", borderRadius: "var(--r3)", padding: "8px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
-                    onClick={() => { onDelete(); setShowDeleteConfirm(false); }}
-                  >삭제 확인</button>
+                    style={{
+                      background: "var(--rd)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "var(--r3)",
+                      padding: "8px 14px",
+                      fontSize: 12,
+                      fontFamily: "'Noto Sans KR', sans-serif",
+                    }}
+                    onClick={() => {
+                      onDelete();
+                      setShowDeleteConfirm(false);
+                    }}
+                  >
+                    삭제 확인
+                  </button>
                   <button
                     className="flex-1 cursor-pointer transition-opacity hover:opacity-85"
-                    style={{ background: "var(--sf2)", color: "var(--tx2)", border: "1px solid var(--bd)", borderRadius: "var(--r3)", padding: "8px 14px", fontSize: 12, fontFamily: "'Noto Sans KR', sans-serif" }}
+                    style={{
+                      background: "var(--sf2)",
+                      color: "var(--tx2)",
+                      border: "1px solid var(--bd)",
+                      borderRadius: "var(--r3)",
+                      padding: "8px 14px",
+                      fontSize: 12,
+                      fontFamily: "'Noto Sans KR', sans-serif",
+                    }}
                     onClick={() => setShowDeleteConfirm(false)}
-                  >취소</button>
+                  >
+                    취소
+                  </button>
                 </div>
               </div>
             )}
@@ -929,30 +1411,79 @@ export default function DetailPanel({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 mb-6" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--tx3)" }}>
+    <div
+      className="flex items-center gap-3 mb-6"
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        color: "var(--tx3)",
+      }}
+    >
       {children}
       <div className="flex-1" style={{ height: 1, background: "var(--bd)" }} />
     </div>
   );
 }
 
-function FormBox({ title, children }: { title: string; children: React.ReactNode }) {
+function FormBox({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mb-12" style={{ background: "var(--bg)", border: "1px solid var(--bd)", borderRadius: "var(--r2)", padding: 26 }}>
-      <div className="font-bold" style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 18 }}>{title}</div>
+    <div
+      className="mb-12"
+      style={{
+        background: "var(--bg)",
+        border: "1px solid var(--bd)",
+        borderRadius: "var(--r2)",
+        padding: 26,
+      }}
+    >
+      <div
+        className="font-bold"
+        style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 18 }}
+      >
+        {title}
+      </div>
       {children}
     </div>
   );
 }
 
-function AmtInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function AmtInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="font-bold uppercase" style={{ fontSize: 9, color: "var(--tx3)", letterSpacing: 0.5 }}>{label}</div>
+      <div
+        className="font-bold uppercase"
+        style={{ fontSize: 9, color: "var(--tx3)", letterSpacing: 0.5 }}
+      >
+        {label}
+      </div>
       <input
         type="number"
         className="w-full outline-none transition-all focus:border-[var(--gn)]"
-        style={{ padding: "7px 10px", border: "1px solid var(--bd)", borderRadius: "var(--r3)", fontSize: 12, fontFamily: "'DM Mono', monospace", background: "var(--sf)", color: "var(--tx)" }}
+        style={{
+          padding: "7px 10px",
+          border: "1px solid var(--bd)",
+          borderRadius: "var(--r3)",
+          fontSize: 12,
+          fontFamily: "'DM Mono', monospace",
+          background: "var(--sf)",
+          color: "var(--tx)",
+        }}
         placeholder="0"
         value={value || ""}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
