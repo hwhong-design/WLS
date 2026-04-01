@@ -29,6 +29,8 @@ export default function Navigation({
     { id: "disp", icon: "🥊", label: "분쟁", count: dispCount },
     { id: "stats", icon: "📊", label: "통계" },
     { id: "doc", icon: "📄", label: "공문 발행" },
+    { id: "guide", icon: "📚", label: "업무가이드" },
+    { id: "debtors", icon: "👥", label: "채무자 정보" },
   ];
 
   return (
@@ -39,21 +41,19 @@ export default function Navigation({
         borderBottom: "1px solid var(--bd)",
         padding: "0 32px",
         boxShadow: "var(--sh0)",
+        overflowX: "auto",
       }}
     >
       {items.map((item) => (
         <div
           key={item.id}
-          className="flex items-center gap-1.5 cursor-pointer select-none transition-all"
+          className="flex items-center gap-1.5 cursor-pointer select-none transition-all whitespace-nowrap"
           style={{
-            padding: "14px 20px",
+            padding: "14px 16px",
             fontSize: 13,
             fontWeight: activeTab === item.id ? 600 : 500,
-            color:
-              activeTab === item.id ? "var(--gn)" : "var(--tx3)",
-            borderBottom: `2px solid ${
-              activeTab === item.id ? "var(--gn)" : "transparent"
-            }`,
+            color: activeTab === item.id ? "var(--gn)" : "var(--tx3)",
+            borderBottom: `2px solid ${activeTab === item.id ? "var(--gn)" : "transparent"}`,
             position: "relative",
             top: 1,
             letterSpacing: -0.1,
