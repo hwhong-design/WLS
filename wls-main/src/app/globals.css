@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f3ef;
+  --sf: #fff;
+  --sf2: #ededea;
+  --bd: #e0dfd8;
+  --bd2: #cccbc3;
+  --tx: #181816;
+  --tx2: #5c5c58;
+  --tx3: #9c9c96;
+  --gn: #1a3a2c;
+  --gn2: #2a5a44;
+  --gl: #e8f2ec;
+  --gl2: #d0e8d8;
+  --gd: #9a7820;
+  --gdl: #faf3e0;
+  --gd2: #c49a28;
+  --rd: #b83228;
+  --rl: #fce8e6;
+  --rd2: #d94030;
+  --og: #b85010;
+  --ol: #fdf0e8;
+  --bl: #1a3a7a;
+  --bll: #e8eef8;
+  --sh0: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --sh1: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --sh2: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --r: 10px;
+  --r2: 8px;
+  --r3: 6px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Noto Sans KR", sans-serif;
+  background: var(--bg);
+  color: var(--tx);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bd2);
+  border-radius: 2px;
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.2s ease;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.22s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.animate-blink {
+  animation: blink 1.5s infinite;
+}
