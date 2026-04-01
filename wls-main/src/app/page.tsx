@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { CaseCard, CaseType, TabId, Label, LabelColor, DocAttachment } from "@/lib/types";
 import {
   initialRecvData,
@@ -19,11 +19,42 @@ import StatsPage from "@/components/StatsPage";
 import DetailPanel from "@/components/DetailPanel";
 import Toast from "@/components/Toast";
 
+/* ── localStorage helpers ── */
+function loadStorage<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function saveStorage(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
 export default function Page() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
-  const [recvData, setRecvData] = useState<CaseCard[]>(initialRecvData);
-  const [dispData, setDispData] = useState<CaseCard[]>(initialDispData);
-  const [allLabels, setAllLabels] = useState<Label[]>(DEFAULT_LABELS);
+
+  // ── 데이터: localStorage에서 초기화 ──
+  const [recvData, setRecvData] = useState<CaseCard[]>(() =>
+    loadStorage("wls_recv", initialRecvData)
+  );
+  const [dispData, setDispData] = useState<CaseCard[]>(() =>
+    loadStorage("wls_disp", initialDispData)
+  );
+  const [allLabels, setAllLabels] = useState<Label[]>(() =>
+    loadStorage("wls_labels", DEFAULT_LABELS)
+  );
+
+  // ── 변경 시 localStorage 자동 저장 ──
+  useEffect(() => { saveStorage("wls_recv", recvData); }, [recvData]);
+  useEffect(() => { saveStorage("wls_disp", dispData); }, [dispData]);
+  useEffect(() => { saveStorage("wls_labels", allLabels); }, [allLabels]);
+
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailCard, setDetailCard] = useState<CaseCard | null>(null);
   const [detailType, setDetailType] = useState<CaseType | null>(null);
@@ -71,41 +102,27 @@ export default function Page() {
   }
 
   function handleMoveRecv(id: string, newCol: string) {
-    updateCard("recv", id, (c) => ({
-      ...c,
-      col: newCol,
-      lu: getTodayISO(),
-    }));
+    updateCard("recv", id, (c) => ({ ...c, col: newCol, lu: getTodayISO() }));
     const card = recvData.find((c) => c.id === id);
     showToast(`"${card?.name}" → ${newCol} 이동 완료`);
   }
 
   function handleMoveDisp(id: string, newCol: string) {
-    updateCard("disp", id, (c) => ({
-      ...c,
-      col: newCol,
-      lu: getTodayISO(),
-    }));
+    updateCard("disp", id, (c) => ({ ...c, col: newCol, lu: getTodayISO() }));
     const card = dispData.find((c) => c.id === id);
     showToast(`"${card?.name}" → ${newCol} 이동 완료`);
   }
 
   function handleStatusChange(newCol: string) {
     if (!detailCard || !detailType) return;
-    updateCard(detailType, detailCard.id, (c) => ({
-      ...c,
-      col: newCol,
-      lu: getTodayISO(),
-    }));
+    updateCard(detailType, detailCard.id, (c) => ({ ...c, col: newCol, lu: getTodayISO() }));
     showToast(`"${detailCard.name}" → ${newCol} 이동 완료`);
   }
 
   function handleAddTimeline(dt: string, ti: string, dc: string) {
     if (!detailCard || !detailType) return;
     const fmtDate = new Date(dt).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
+      year: "numeric", month: "numeric", day: "numeric",
     });
     updateCard(detailType, detailCard.id, (c) => ({
       ...c,
@@ -115,6 +132,30 @@ export default function Page() {
     showToast("기록이 추가됐어요.");
   }
 
+  // ── 타임라인 수정 ──
+  function handleEditTimeline(index: number, dt: string, ti: string, dc: string) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      tl: c.tl.map((entry, i) =>
+        i === index ? { ...entry, dt, ti, dc } : entry
+      ),
+      lu: getTodayISO(),
+    }));
+    showToast("타임라인이 수정됐어요.");
+  }
+
+  // ── 타임라인 삭제 ──
+  function handleDeleteTimeline(index: number) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      tl: c.tl.filter((_, i) => i !== index),
+      lu: getTodayISO(),
+    }));
+    showToast("타임라인이 삭제됐어요.");
+  }
+
   function handleAddFollowUp(dt: string, ti: string) {
     if (!detailCard || !detailType) return;
     updateCard(detailType, detailCard.id, (c) => ({
@@ -122,6 +163,26 @@ export default function Page() {
       fu: [...c.fu, { dt, ti, dn: false }],
     }));
     showToast("팔로업이 추가됐어요.");
+  }
+
+  // ── 팔로업 수정 ──
+  function handleEditFollowUp(index: number, dt: string, ti: string) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      fu: c.fu.map((f, i) => (i === index ? { ...f, dt, ti } : f)),
+    }));
+    showToast("팔로업이 수정됐어요.");
+  }
+
+  // ── 팔로업 삭제 ──
+  function handleDeleteFollowUp(index: number) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      fu: c.fu.filter((_, i) => i !== index),
+    }));
+    showToast("팔로업이 삭제됐어요.");
   }
 
   function handleToggleFollowUp(index: number) {
@@ -171,6 +232,16 @@ export default function Page() {
     }));
   }
 
+  // ── 드라이브 URL 수정 ──
+  function handleSaveDriveUrl(url: string) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      drv: url,
+    }));
+    showToast("드라이브 링크가 저장됐어요.");
+  }
+
   function handleAddDoc(doc: DocAttachment) {
     if (!detailCard || !detailType) return;
     updateCard(detailType, detailCard.id, (c) => ({
@@ -189,9 +260,20 @@ export default function Page() {
     showToast("문서가 삭제됐어요.");
   }
 
-  /* ── Label management ── */
+  // ── 첨부문서 수정 ──
+  function handleEditDoc(index: number, doc: DocAttachment) {
+    if (!detailCard || !detailType) return;
+    updateCard(detailType, detailCard.id, (c) => ({
+      ...c,
+      docs: (c.docs || []).map((d, i) => (i === index ? doc : d)),
+    }));
+    showToast("문서가 수정됐어요.");
+  }
 
-  const labelIdCounter = useRef(100);
+  /* ── Label management ── */
+  const labelIdCounter = useRef(
+    loadStorage<number>("wls_label_counter", 100)
+  );
 
   function handleToggleLabel(ty: CaseType, cardId: string, labelId: string) {
     updateCard(ty, cardId, (c) => ({
@@ -204,6 +286,7 @@ export default function Page() {
 
   function handleCreateLabel(name: string, color: LabelColor) {
     const id = `lb${labelIdCounter.current++}`;
+    saveStorage("wls_label_counter", labelIdCounter.current);
     setAllLabels((prev) => [...prev, { id, name, color }]);
     showToast(`"${name}" 라벨이 생성됐어요.`);
   }
@@ -211,27 +294,23 @@ export default function Page() {
   function handleDeleteLabel(labelId: string) {
     const label = allLabels.find((lb) => lb.id === labelId);
     setAllLabels((prev) => prev.filter((lb) => lb.id !== labelId));
-    // Remove from all cards
     setRecvData((prev) =>
-      prev.map((c) => ({
-        ...c,
-        labels: c.labels.filter((id) => id !== labelId),
-      }))
+      prev.map((c) => ({ ...c, labels: c.labels.filter((id) => id !== labelId) }))
     );
     setDispData((prev) =>
-      prev.map((c) => ({
-        ...c,
-        labels: c.labels.filter((id) => id !== labelId),
-      }))
+      prev.map((c) => ({ ...c, labels: c.labels.filter((id) => id !== labelId) }))
     );
     if (label) showToast(`"${label.name}" 라벨이 삭제됐어요.`);
   }
 
   /* ── Add card ── */
+  const nextIdCounter = useRef(
+    loadStorage<number>("wls_id_counter", 100)
+  );
 
-  const nextIdCounter = useRef(100);
   function handleAddRecvCard(col: string) {
     const id = `r${nextIdCounter.current++}`;
+    saveStorage("wls_id_counter", nextIdCounter.current);
     const newCard: CaseCard = {
       id,
       name: "새 미수채권",
@@ -251,6 +330,7 @@ export default function Page() {
 
   function handleAddDispCard(col: string) {
     const id = `d${nextIdCounter.current++}`;
+    saveStorage("wls_id_counter", nextIdCounter.current);
     const newCard: CaseCard = {
       id,
       name: "새 분쟁",
@@ -342,15 +422,21 @@ export default function Page() {
         onClose={() => setDetailOpen(false)}
         onStatusChange={handleStatusChange}
         onAddTimeline={handleAddTimeline}
+        onEditTimeline={handleEditTimeline}
+        onDeleteTimeline={handleDeleteTimeline}
         onAddFollowUp={handleAddFollowUp}
+        onEditFollowUp={handleEditFollowUp}
+        onDeleteFollowUp={handleDeleteFollowUp}
         onToggleFollowUp={handleToggleFollowUp}
         onSaveAmount={handleSaveAmount}
         onRename={handleRename}
         onDelete={handleDelete}
         onSaveSolDt={handleSaveSolDt}
         onSaveProjUrl={handleSaveProjUrl}
+        onSaveDriveUrl={handleSaveDriveUrl}
         onAddDoc={handleAddDoc}
         onDeleteDoc={handleDeleteDoc}
+        onEditDoc={handleEditDoc}
         showToast={showToast}
       />
       <Toast message={toastMsg} visible={toastVisible} />
