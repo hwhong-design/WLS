@@ -34,6 +34,21 @@ export interface Label {
   color: LabelColor;
 }
 
+export interface Debtor {
+  id: string;
+  type: "corp" | "ind";
+  name: string;
+  ceo?: string;
+  bizNo?: string;
+  rrn?: string;
+  phone?: string;
+  address?: string;
+  caseNo?: string;
+  amount?: number;
+  memo?: string;
+  createdAt: string;
+}
+
 export interface CaseCard {
   id: string;
   name: string;
@@ -43,13 +58,23 @@ export interface CaseCard {
   drv: string;
   lu: string;
   amt?: AmountInfo;
-  solDt?: string; // 소멸시효 날짜
-  projUrl?: string; // 프로젝트 링크
+  solDt?: string;
+  projUrl?: string;
   docs?: DocAttachment[];
   tl: TimelineEntry[];
   fu: FollowUp[];
+  debtorId?: string;
+  debtorInfo?: {
+    type?: string;
+    phone?: string;
+    address?: string;
+    bizNo?: string;
+    rrn?: string;
+    ceo?: string;
+    caseNo?: string;
+  };
 }
 
 export type CaseType = "recv" | "disp";
 
-export type TabId = "home" | "doc" | "recv" | "disp" | "stats";
+export type TabId = "home" | "doc" | "recv" | "disp" | "stats" | "guide" | "debtors";
